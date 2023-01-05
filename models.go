@@ -1,4 +1,4 @@
-package gomelcloud
+package melcloud
 
 type loginRequest struct {
     AppVersion, Email, Password string

@@ -1,4 +1,4 @@
-package gomelcloud
+package melcloud
 
 import (
 	"bytes"
@@ -19,12 +19,18 @@ const (
 )
 
 type MelcloudRequestor struct {
+    zerolog.Logger
+
     client *http.Client
     contextKey string
     reauthenticate func() (string, error)
 }
 
-func Authenticate(Email, Password string) (*MelcloudRequestor, error) {
+func Authenticate(email, password string) (*MelcloudRequestor, error) {
+    return AuthenticateWithLogger(email, password, log.With().Str("module", "go-melcloud").Logger())
+}
+
+func AuthenticateWithLogger(email, password string, log zerolog.Logger) (*MelcloudRequestor, error) {
     client := http.DefaultClient
 
     log.Info().Msg("Authenticating with MELCloud...")
@@ -32,8 +38,8 @@ func Authenticate(Email, Password string) (*MelcloudRequestor, error) {
     request := loginRequest{
         AppVersion:      "1.21.6.0",
         CaptchaResponse: nil,
-        Email:           Email,
-        Password:        Password,
+        Email:           email,
+        Password:        password,
         Language:        19,
         Persist:         true,
     }
@@ -70,7 +76,7 @@ func Authenticate(Email, Password string) (*MelcloudRequestor, error) {
         client:         client,
         contextKey:     response.LoginData.ContextKey,
         reauthenticate: func() (string, error) {
-            result, err := Authenticate(Email, Password)
+            result, err := AuthenticateWithLogger(email, password, log)
             if err != nil {
                 return "", fmt.Errorf("Reauthentication failed: %w", err)
             }
@@ -90,7 +96,7 @@ func (r *MelcloudRequestor) GetDeviceInformation(DeviceId, BuildingId string) (i
     q.Set("buildingID", BuildingId)
     url.RawQuery = q.Encode()
 
-    log.Debug().
+    r.Logger.Debug().
         Str("url", url.String()).
         Str("deviceID", DeviceId).
         Str("buildingID", BuildingId).
@@ -106,7 +112,7 @@ func (r *MelcloudRequestor) GetDeviceInformation(DeviceId, BuildingId string) (i
         return nil, fmt.Errorf("Unable to get device info from MELCloud: %w", err)
     }
 
-    log.Trace().
+    r.Logger.Trace().
         Int("statusCode", res.StatusCode).
         Func(func(e *zerolog.Event) {
             res, _ := httputil.DumpResponse(res, true)
@@ -128,7 +134,7 @@ func (r *MelcloudRequestor) makeRequest(req *http.Request) (*http.Response, erro
 
     if res.StatusCode == http.StatusUnauthorized {
         res.Body.Close()
-        log.Warn().Msg("Performing MELCloud reauthentication")
+        r.Logger.Warn().Msg("Performing MELCloud reauthentication")
         // Try to reauthenticate...
         contextKey, err := r.reauthenticate()
         if err != nil {
