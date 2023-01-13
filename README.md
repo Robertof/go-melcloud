@@ -27,15 +27,20 @@ func main() {
         log.With().Str("module", "go-melcloud").Logger(),
     )
 
-    // Get information about a specific device
-    info, err := m.GetDeviceInformation(deviceID, buildingID)
-    defer info.Close()
+    // Get the device list. This API call contains quite in-depth information about
+    // devices which is not exposed via GetDeviceInformation(DeviceID, BuildingID)!
+    data, err := m.GetDeviceList()
 
-    // info is a io.ReadCloser, use json.Unmarshal with your own model or just deserialize
+    // or... get information about a specific device.
+    data, err := m.GetDeviceInformation(deviceID, buildingID)
+
+    defer data.Close()
+
+    // data is a io.ReadCloser, use json.Unmarshal with your own model or just deserialize
     // to a dictionary
-    var data map[string]interface{}
+    var result map[string]interface{}
 
-    err := json.NewDecoder(info).Decode(&data)
+    err := json.NewDecoder(data).Decode(&result)
 }
 ```
 

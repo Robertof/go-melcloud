@@ -16,6 +16,7 @@ import (
 const (
     loginUrl      = "https://app.melcloud.com/Mitsubishi.Wifi.Client/Login/ClientLogin"
     deviceInfoUrl = "https://app.melcloud.com/Mitsubishi.Wifi.Client/Device/Get"
+    deviceListUrl = "https://app.melcloud.com/Mitsubishi.Wifi.Client/User/ListDevices"
 )
 
 type MelcloudRequestor struct {
@@ -102,14 +103,31 @@ func (r *MelcloudRequestor) GetDeviceInformation(DeviceId, BuildingId string) (i
         Str("buildingID", BuildingId).
         Msg("Requesting device info from MELCloud")
 
-    req, err := http.NewRequest("GET", url.String(), nil)
+    return r.makeGet(url)
+}
+
+func (r *MelcloudRequestor) GetDeviceList() (io.ReadCloser, error) {
+    url, err := url.Parse(deviceListUrl)
     if err != nil {
-        return nil, fmt.Errorf("Unable to get device info from MELCloud: %w", err)
+        panic(err)
+    }
+
+    r.Logger.Debug().
+        Str("url", url.String()).
+        Msg("Requesting device list from MELCloud")
+
+    return r.makeGet(url)
+}
+
+func (r *MelcloudRequestor) makeGet(u *url.URL) (io.ReadCloser, error) {
+    req, err := http.NewRequest("GET", u.String(), nil)
+    if err != nil {
+        return nil, fmt.Errorf("Unable to query MELCloud: %w", err)
     }
 
     res, err := r.makeRequest(req)
     if err != nil {
-        return nil, fmt.Errorf("Unable to get device info from MELCloud: %w", err)
+        return nil, fmt.Errorf("Unable to query MELCloud: %w", err)
     }
 
     r.Logger.Trace().
@@ -118,7 +136,7 @@ func (r *MelcloudRequestor) GetDeviceInformation(DeviceId, BuildingId string) (i
             res, _ := httputil.DumpResponse(res, true)
             e.Str("response", string(res))
         }).
-        Msg("Received MELCloud device information response")
+        Msg("Received response from MELCloud")
 
     return res.Body, nil
 }
