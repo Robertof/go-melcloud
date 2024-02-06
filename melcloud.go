@@ -3,6 +3,7 @@ package melcloud
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,14 @@ const (
     loginUrl      = "https://app.melcloud.com/Mitsubishi.Wifi.Client/Login/ClientLogin"
     deviceInfoUrl = "https://app.melcloud.com/Mitsubishi.Wifi.Client/Device/Get"
     deviceListUrl = "https://app.melcloud.com/Mitsubishi.Wifi.Client/User/ListDevices"
+)
+
+var (
+    // used to signal that MELCloud has asked us to backoff.
+    ErrTooManyRequests = errors.New("too many requests")
+
+    // used to signal a generic unexpected status code.
+    ErrUnexpectedStatus = errors.New("unexpected status code")
 )
 
 type MelcloudRequestor struct {
@@ -137,6 +146,14 @@ func (r *MelcloudRequestor) makeGet(u *url.URL) (io.ReadCloser, error) {
             e.Str("response", string(res))
         }).
         Msg("Received response from MELCloud")
+
+    if res.StatusCode == http.StatusTooManyRequests {
+        res.Body.Close()
+        return nil, ErrTooManyRequests
+    } else if res.StatusCode != http.StatusOK {
+        res.Body.Close()
+        return nil, fmt.Errorf("%w: got unexpected status code: %v", ErrUnexpectedStatus, res.StatusCode)
+    }
 
     return res.Body, nil
 }
